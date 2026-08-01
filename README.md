@@ -1,5 +1,7 @@
 # Orius Solar Operations
 
+**Demo pública:** [nestorvg95.github.io/orius-solar-operations](https://nestorvg95.github.io/orius-solar-operations/)
+
 Reactivación y modernización de un proyecto legado de operaciones solares para portafolio. La primera entrega es una demo estática, segura para mostrar, que reconstruye los flujos de garantías, inventario y trazabilidad sin conectarse a los datos antiguos de Orius Solar.
 
 ## Qué encontré en el legado
