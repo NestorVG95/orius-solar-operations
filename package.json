@@ -1,0 +1,23 @@
+{
+  "name": "orius-solar-operations",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Portfolio-safe solar field operations workbench.",
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "dev": "vite portal",
+    "preview": "vite preview",
+    "check:html": "node --check portal/app.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.4",
+    "@playwright/test": "^1.54.2",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4"
+  }
+}
