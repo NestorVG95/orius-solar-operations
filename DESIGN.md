@@ -11,13 +11,13 @@ FORM: Operate mode, replacement visual world; field log / instrumentation direct
 
 ## Visual world
 
-The interface borrows from a solar technician's clipboard and an equipment room's instrument panel: dark green-black surfaces for outdoor glare control, warm amber for actions and document issuance, cyan for connected/verified states, and red only for attention. It is intentionally not a stock purple SaaS dashboard or a glassmorphism panel collection.
+The interface borrows from a solar technician's clipboard and an equipment room's instrument panel: midnight blue surfaces for outdoor glare control, warm amber for actions and document issuance, electric blue for connected/verified states, and red only for attention. It is intentionally not a stock purple SaaS dashboard or a glassmorphism panel collection.
 
 ## Tokens
 
-- Background: `#081210`; raised surface: `#10201C`; elevated surface: `#162923`.
-- Text: `#F3F5E9`; muted text: `#A8B8AE`; rule: `#2C443C`.
-- Accent amber: `#FFC857`; accent cyan: `#78D8D0`; danger: `#F47B6C`; success: `#90D7A5`.
+- Background: `#081426`; raised surface: `#0E1D32`; elevated surface: `#142844`.
+- Text: `#F1F6FF`; muted text: `#A9BAD0`; rule: `#294563`.
+- Accent amber: `#FFC857`; accent blue: `#66C7FF`; danger: `#F47B6C`; success/verified: `#8FD8FF`.
 - Display face: `Space Grotesk`; body face: `DM Sans`; data face: `IBM Plex Mono`.
 - Radius: 14px for surfaces, 9px for controls, full pills only for statuses.
 - Elevation uses one soft offset shadow; borders are not stacked with wide glows.

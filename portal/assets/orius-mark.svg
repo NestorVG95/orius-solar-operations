@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
   <title id="title">Orius Solar mark</title><desc id="desc">A geometric sun and panel mark</desc>
   <rect width="64" height="64" rx="16" fill="#FFC857"/>
-  <path fill="#081210" d="M18 14h11v22.5l-11 8.4V14Zm17 0h11v36H35V14Z"/>
-  <path fill="#78D8D0" d="M18 49.3h28v4.7H18z"/>
+  <path fill="#081426" d="M18 14h11v22.5l-11 8.4V14Zm17 0h11v36H35V14Z"/>
+  <path fill="#66C7FF" d="M18 49.3h28v4.7H18z"/>
 </svg>
