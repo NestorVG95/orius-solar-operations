@@ -1,10 +1,16 @@
 import {
   DEMO_CREDENTIALS,
+  DEFAULT_PERMISSIONS,
+  PERMISSION_DEFINITIONS,
+  ROLE_DEFINITIONS,
   escapeHtml as esc,
   formatDate,
   isValidDemoCredentials,
+  roleLabel,
   statusClass,
   validateTransferInput,
+  validatePasswordResetInput,
+  validateUserInput,
   validateWarrantyInput,
 } from "./core.js";
 
@@ -29,11 +35,22 @@ const seed = {
     { title: "Tool checked out", detail: "TL-042 · Van OR-04", time: "18 Jun · 08:11" },
     { title: "Project trail updated", detail: "OR-018 · Crew Delta assigned", time: "17 Jun · 16:48" },
   ],
+  users: [
+    { id: "demo-user", name: "Alex Rivera", email: "demo@orius.local", role: "admin", status: "Active", lastAccess: "Just now" },
+    { id: "usr-102", name: "Morgan Chen", email: "morgan.chen@example.test", role: "manager", status: "Active", lastAccess: "Today · 08:42" },
+    { id: "usr-103", name: "Taylor Brooks", email: "taylor.brooks@example.test", role: "warehouse", status: "Active", lastAccess: "Yesterday · 16:10" },
+  ],
+  permissions: DEFAULT_PERMISSIONS,
 };
 
 const cloneSeed = () => JSON.parse(JSON.stringify(seed));
 const loadState = () => {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || cloneSeed(); } catch { return cloneSeed(); }
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (!saved) return cloneSeed();
+    const defaults = cloneSeed();
+    return { ...defaults, ...saved, users: saved.users || defaults.users, permissions: saved.permissions || defaults.permissions };
+  } catch { return cloneSeed(); }
 };
 const saveState = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* private browsing: keep the current session in memory */ } };
 const icon = (id) => `<svg aria-hidden="true"><use href="#icon-${id}"></use></svg>`;
@@ -67,19 +84,31 @@ function toast(message, error = false) {
   window.setTimeout(() => node.remove(), 3600);
 }
 
-function renderLogin(message = "") {
-  currentUser = null;
-  appShell.hidden = true;
-  authView.hidden = false;
-  authView.innerHTML = `<div class="auth-visual"><div class="auth-visual-copy"><p class="kicker">Orius Solar / secure workspace</p><h1>Keep the workday moving. Keep the <em>trail</em> intact.</h1><p>One calm workspace for warranty documents, tools, crews, and the operational record that connects them.</p></div></div><div class="auth-panel"><div class="auth-panel-inner"><div class="auth-brand"><img src="./assets/orius-mark.svg" alt="" /><div><strong>orius solar</strong><span class="role-chip">operations crm</span></div></div><div class="auth-header"><p class="kicker">Workspace access</p><h2>Sign in to operations</h2><p>Use your organization account to continue. This public version is a synthetic portfolio environment.</p></div><form class="auth-form" id="login-form"><div class="field"><label for="login-email">Work email</label><input id="login-email" name="email" type="email" autocomplete="username" placeholder="you@company.com" required /></div><div class="field"><label for="login-password">Password</label><div class="password-field"><input id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" minlength="8" required /><button class="password-toggle" type="button" id="password-toggle" aria-label="Show password">${icon("file")}</button></div></div><p class="auth-message" id="auth-message" role="alert">${esc(message)}</p><button class="button button-primary" type="submit" id="login-button">Sign in ${icon("arrow")}</button></form>${runtime.demoMode ? `<div class="demo-access"><span class="note-mark">i</span><div><strong>Demo access</strong><span>Email <code>${DEMO_CREDENTIALS.email}</code> · Password <code>${DEMO_CREDENTIALS.password}</code></span></div></div>` : ""}<p class="auth-legal">Your session is protected by a secure cookie and server-side authorization in production.</p></div></div>`;
-  const form = document.querySelector("#login-form");
-  form.addEventListener("submit", handleLogin);
-  document.querySelector("#password-toggle").addEventListener("click", () => {
-    const input = document.querySelector("#login-password"); const showing = input.type === "text";
-    input.type = showing ? "password" : "text"; document.querySelector("#password-toggle").setAttribute("aria-label", showing ? "Show password" : "Hide password");
-  });
+function authBrand() {
+  return `<div class="auth-brand"><img src="./assets/orius-mark.png" alt="" /><div><strong>orius solar</strong><span class="role-chip">operations crm</span></div></div>`;
 }
 
+function renderLogin(message = "") {
+  currentUser = null; appShell.hidden = true; authView.hidden = false;
+  authView.innerHTML = `<div class="auth-visual"><div class="auth-visual-copy"><p class="kicker">Orius Solar / secure workspace</p><h1>Keep the workday moving. Keep the <em>trail</em> intact.</h1><p>One calm workspace for warranty documents, tools, crews, and the operational record that connects them.</p><div class="auth-proof"><span>01</span><p>One source of truth for every field handoff.</p></div></div></div><div class="auth-panel"><div class="auth-panel-inner">${authBrand()}<div class="auth-header"><p class="kicker">Workspace access</p><h2>Sign in to operations</h2><p>Use your organization account to continue.</p></div><form class="auth-form" id="login-form"><div class="field"><label for="login-email">Work email</label><input id="login-email" name="email" type="email" autocomplete="username" placeholder="you@company.com" required /></div><div class="field"><div class="field-heading"><label for="login-password">Password</label><button class="inline-link" type="button" id="forgot-password-link">Forgot password?</button></div><div class="password-field"><input id="login-password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" minlength="8" required /><button class="password-toggle" type="button" id="password-toggle" aria-label="Show password">${icon("file")}</button></div></div><p class="auth-message" id="auth-message" role="alert">${esc(message)}</p><button class="button button-primary" type="submit" id="login-button">Sign in ${icon("arrow")}</button></form>${runtime.demoMode ? `<div class="demo-access"><span class="note-mark">i</span><div><strong>Demo access</strong><span>Email <code>${DEMO_CREDENTIALS.email}</code> · Password <code>${DEMO_CREDENTIALS.password}</code></span></div></div>` : ""}<p class="auth-legal">Your session is protected by a secure cookie and server-side authorization.</p></div></div>`;
+  document.querySelector("#login-form").addEventListener("submit", handleLogin);
+  document.querySelector("#forgot-password-link").addEventListener("click", () => renderPasswordRecovery());
+  document.querySelector("#password-toggle").addEventListener("click", () => { const input = document.querySelector("#login-password"); const showing = input.type === "text"; input.type = showing ? "password" : "text"; document.querySelector("#password-toggle").setAttribute("aria-label", showing ? "Show password" : "Hide password"); });
+}
+
+function renderPasswordRecovery(message = "") {
+  currentUser = null; appShell.hidden = true; authView.hidden = false;
+  authView.innerHTML = `<div class="auth-visual"><div class="auth-visual-copy"><p class="kicker">Account recovery / protected flow</p><h1>Get back to the workday without exposing the <em>account.</em></h1><p>We will send recovery instructions only when the address belongs to the workspace. The response never reveals whether an account exists.</p><div class="auth-proof"><span>02</span><p>Generic responses protect account ownership.</p></div></div></div><div class="auth-panel"><div class="auth-panel-inner">${authBrand()}<div class="auth-header"><p class="kicker">Password recovery</p><h2>Reset your password</h2><p>Enter your work email and we will start the secure recovery flow.</p></div><form class="auth-form" id="recovery-form"><div class="field"><label for="recovery-email">Work email</label><input id="recovery-email" name="email" type="email" autocomplete="email" placeholder="you@company.com" required /></div><p class="auth-message" id="recovery-message" role="status">${esc(message)}</p><button class="button button-primary" type="submit" id="recovery-button">Send recovery link ${icon("arrow")}</button></form><button class="text-button auth-back-link" type="button" id="back-to-login">Back to sign in</button>${runtime.demoMode ? `<div class="demo-access recovery-note"><span class="note-mark">i</span><div><strong>Safe demo mode</strong><span>No email is sent. The flow is simulated locally.</span></div></div>` : ""}</div></div>`;
+  document.querySelector("#recovery-form").addEventListener("submit", handlePasswordRecovery);
+  document.querySelector("#back-to-login").addEventListener("click", () => renderLogin());
+}
+
+async function handlePasswordRecovery(event) {
+  event.preventDefault(); const email = new FormData(event.currentTarget).get("email"); const validation = validatePasswordResetInput({ email }); const message = document.querySelector("#recovery-message"); const button = document.querySelector("#recovery-button");
+  if (!validation.valid) { message.textContent = validation.message; message.className = "auth-message is-error"; return; }
+  button.disabled = true; button.textContent = "Preparing recovery…";
+  try { if (!runtime.demoMode) await apiRequest("request-password-reset", { method: "POST", body: JSON.stringify(validation.value) }); message.className = "auth-message is-success"; message.textContent = "If the account exists, recovery instructions will be sent shortly."; button.textContent = "Recovery requested"; } catch (error) { message.className = "auth-message is-error"; message.textContent = error.message || "Unable to start recovery. Try again."; button.disabled = false; button.innerHTML = `Send recovery link ${icon("arrow")}`; }
+}
 async function handleLogin(event) {
   event.preventDefault();
   const form = new FormData(event.currentTarget); const email = String(form.get("email")).trim().toLowerCase(); const password = String(form.get("password"));
@@ -88,7 +117,7 @@ async function handleLogin(event) {
   try {
     if (runtime.demoMode) {
       if (!isValidDemoCredentials(email, password)) throw new ApiError("Demo credentials do not match. Use the access shown below.", 401);
-      currentUser = { id: "demo-user", name: "Alex Rivera", email, role: "Operations admin" };
+      currentUser = { id: "demo-user", name: "Alex Rivera", email, role: "admin" };
     } else {
       const response = await apiRequest("login", { method: "POST", body: JSON.stringify({ email, password }) });
       currentUser = response.user;
@@ -109,13 +138,25 @@ async function enterWorkspace() {
 
 async function loadRemoteState() {
   const [warranties, assets, activity] = await Promise.all([apiRequest("warranties"), apiRequest("assets"), apiRequest("timeline")]);
-  return { warranties: warranties.records || [], assets: assets.records || [], activity: activity.records || [] };
+  const stateData = { warranties: warranties.records || [], assets: assets.records || [], activity: activity.records || [], users: [], permissions: DEFAULT_PERMISSIONS };
+  if (["admin", "operations_admin"].includes(currentUser?.role)) {
+    const [users, permissions] = await Promise.all([apiRequest("users"), apiRequest("permissions")]);
+    stateData.users = users.records || [];
+    stateData.permissions = permissions.records || DEFAULT_PERMISSIONS;
+  }
+  return stateData;
 }
+
+const canManageUsers = () => ["admin", "operations_admin"].includes(currentUser?.role);
+const canManageRoles = () => currentUser?.role === "admin";
 
 function updateUserChrome() {
   const name = currentUser?.name || "Operator"; const initials = name.split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase();
-  document.querySelector("#user-name").textContent = name; document.querySelector("#user-role").textContent = currentUser?.role || "Operations user"; document.querySelector("#user-menu-button").textContent = initials;
+  document.querySelector("#user-name").textContent = name; document.querySelector("#user-role").textContent = roleLabel(currentUser?.role || "viewer"); document.querySelector("#user-menu-button").textContent = initials;
   document.querySelector("#adapter-label").textContent = runtime.demoMode ? "Local demo adapter" : "Secure API session";
+  document.querySelector(".nav-label-admin").hidden = !canManageUsers();
+  document.querySelectorAll("[data-requires-users]").forEach((item) => { item.hidden = !canManageUsers(); });
+  document.querySelectorAll("[data-requires-roles]").forEach((item) => { item.hidden = !canManageRoles(); });
 }
 
 function shellHeader(kicker, title, body, action = "") {
@@ -149,7 +190,26 @@ function renderTraceability() {
   return `${shellHeader("Audit trail / connected records", "Traceability", "A readable history makes operational accountability visible without turning the workday into paperwork.")}<div class="trace-layout"><section class="trace-detail"><div class="block-head"><h3>OR-018 · Maya Thompson</h3><span class="status status-green">Complete trail</span></div>${state.activity.concat([{ title: "Warranty template selected", detail: "10-Year Workmanship · synthetic template", time: "17 Jun · 16:31" }]).slice(0, 8).map((item) => `<div class="trace-record"><time>${esc(item.time)}</time><div><strong>${esc(item.title)}</strong><p>${esc(item.detail)}</p></div></div>`).join("")}</section><aside class="trace-key"><h3>What is connected</h3><div class="key-row">${icon("file")} Warranty document</div><div class="key-row">${icon("grid")} Project OR-018</div><div class="key-row">${icon("route")} Crew Delta</div><div class="key-row">${icon("box")} 2 assigned assets</div><div class="key-row">${icon("check")} ${runtime.demoMode ? "Synthetic / safe to explore" : "Server verified record"}</div></aside></div>`;
 }
 
-const routes = { overview: renderOverview, warranties: renderWarranties, inventory: renderInventory, traceability: renderTraceability };
+function userRows(records) {
+  if (!records.length) return `<tr><td colspan="5"><div class="empty-state">No users have been created yet.</div></td></tr>`;
+  return records.map((user) => `<tr><td><span class="record-title">${esc(user.name)}</span><span class="record-subtitle">${esc(user.email)}</span></td><td><span class="role-badge">${esc(roleLabel(user.role))}</span></td><td><span class="status status-green">${esc(user.status || "Active")}</span></td><td class="mono">${esc(user.lastAccess || "Never")}</td><td><button class="icon-button" data-user-info="${esc(user.email)}" aria-label="View user details">${icon("users")}</button></td></tr>`).join("");
+}
+
+function renderUsers() {
+  if (!canManageUsers()) return `${shellHeader("Administration / restricted", "Users", "Your profile does not have permission to manage users.")}<div class="empty-state access-denied">${icon("lock")}<strong>Access restricted</strong><p>Ask an administrator for the users.manage permission.</p></div>`;
+  return `${shellHeader("Administration / ${state.users.length} members", "Users", "Create operators, assign a profile, and keep access accountable.", `<button class="button button-primary" data-scroll="user-form">${icon("plus")} Create user</button>`)}<div class="toolbar"><div class="search-field">${icon("search")}<input id="user-search" type="search" placeholder="Search name or email" aria-label="Search users" /></div><span class="toolbar-note"><span class="status-dot"></span>Every user needs a named profile</span></div><div class="data-table-wrap"><table class="data-table"><thead><tr><th>User</th><th>Profile</th><th>Status</th><th>Last access</th><th></th></tr></thead><tbody id="user-rows">${userRows(state.users)}</tbody></table></div><div class="form-layout" id="user-form"><form class="form-panel" id="new-user-form"><h2>Create a user</h2><div class="form-grid"><div class="field"><label for="user-name-input">Full name</label><input id="user-name-input" name="name" placeholder="Jamie Parker" minlength="2" maxlength="100" required /></div><div class="field"><label for="user-email-input">Work email</label><input id="user-email-input" name="email" type="email" placeholder="jamie@company.com" maxlength="190" required /></div><div class="field"><label for="user-password-input">Temporary password</label><input id="user-password-input" name="password" type="password" placeholder="At least 12 characters" minlength="12" maxlength="128" required /></div><div class="field"><label for="user-role-input">Profile</label><select id="user-role-input" name="role">${ROLE_DEFINITIONS.map((role) => `<option value="${esc(role.id)}">${esc(role.label)}</option>`).join("")}</select></div></div><div class="form-actions"><button class="button button-primary" type="submit">Create user ${icon("arrow")}</button><span class="form-message">Temporary credentials must be rotated at first sign-in.</span></div></form><aside class="info-rail"><h3>Access hygiene</h3><p>Profiles define what each operator can see and change. Never share a permanent password through chat.</p><ul><li>Use a unique temporary password.</li><li>Assign the least privilege needed.</li><li>Review inactive accounts monthly.</li></ul></aside></div>`;
+}
+
+function permissionRows() {
+  return ROLE_DEFINITIONS.map((role) => `<tr><th scope="row"><span class="record-title">${esc(role.label)}</span><span class="record-subtitle">${esc(role.description)}</span></th>${PERMISSION_DEFINITIONS.map((permission) => { const checked = (state.permissions[role.id] || []).includes(permission.id); return `<td><label class="permission-toggle"><input type="checkbox" data-permission-role="${esc(role.id)}" data-permission="${esc(permission.id)}" ${checked ? "checked" : ""} aria-label="${esc(role.label)}: ${esc(permission.label)}" /><span></span></label></td>`; }).join("")}</tr>`).join("");
+}
+
+function renderPermissions() {
+  if (!canManageRoles()) return `${shellHeader("Administration / restricted", "Permissions", "Only administrators can configure role permissions.")}<div class="empty-state access-denied">${icon("lock")}<strong>Access restricted</strong><p>Ask an administrator to review role policies.</p></div>`;
+  return `${shellHeader("Administration / role policy", "Permissions", "Configure the access matrix once, then assign the right profile to each user.")}<form class="permissions-panel" id="permissions-form"><div class="permissions-intro"><div><p class="kicker">Least privilege</p><h2>Role access matrix</h2><p>Permissions are grouped by capability. A user receives the permissions of their assigned profile.</p></div><button class="button button-primary" type="submit">Save permission policy ${icon("check")}</button></div><div class="permission-table-wrap"><table class="permission-table"><thead><tr><th>Profile</th>${PERMISSION_DEFINITIONS.map((permission) => `<th title="${esc(permission.label)}">${esc(permission.label)}</th>`).join("")}</tr></thead><tbody>${permissionRows()}</tbody></table></div><p class="form-message">Changes are local to this safe demo. Production saves require an administrator session and CSRF token.</p></form>`;
+}
+
+const routes = { overview: renderOverview, warranties: renderWarranties, inventory: renderInventory, traceability: renderTraceability, users: renderUsers, permissions: renderPermissions };
 function navigate(route = "overview") {
   const safeRoute = routes[route] ? route : "overview"; activeRoute = safeRoute; view.innerHTML = routes[safeRoute]();
   document.querySelectorAll(".nav-item").forEach((item) => item.classList.toggle("is-active", item.dataset.route === safeRoute));
@@ -164,8 +224,12 @@ function bindViewEvents() {
   document.querySelectorAll("[data-copy]").forEach((button) => button.addEventListener("click", async () => { try { await navigator.clipboard.writeText(button.dataset.copy); toast(`${button.dataset.copy} copied to clipboard.`); } catch { toast(button.dataset.copy); } }));
   const warrantySearch = document.querySelector("#warranty-search"); warrantySearch?.addEventListener("input", () => { const term = warrantySearch.value.toLowerCase(); document.querySelector("#warranty-rows").innerHTML = warrantyRows(state.warranties.filter((item) => Object.values(item).some((value) => String(value).toLowerCase().includes(term)))); });
   const assetSearch = document.querySelector("#asset-search"); assetSearch?.addEventListener("input", () => { const term = assetSearch.value.toLowerCase(); document.querySelector("#asset-rows").innerHTML = assetRows(state.assets.filter((item) => Object.values(item).some((value) => String(value).toLowerCase().includes(term)))); });
+  const userSearch = document.querySelector("#user-search"); userSearch?.addEventListener("input", () => { const term = userSearch.value.toLowerCase(); document.querySelector("#user-rows").innerHTML = userRows(state.users.filter((item) => Object.values(item).some((value) => String(value).toLowerCase().includes(term)))); });
   document.querySelector("#new-warranty-form")?.addEventListener("submit", createWarranty);
   document.querySelector("#new-transfer-form")?.addEventListener("submit", transferAsset);
+  document.querySelector("#new-user-form")?.addEventListener("submit", createUser);
+  document.querySelector("#permissions-form")?.addEventListener("submit", savePermissions);
+  document.querySelectorAll("[data-user-info]").forEach((button) => button.addEventListener("click", () => toast(`${button.dataset.userInfo} · profile details are visible in the users table.`)));
 }
 
 async function createWarranty(event) {
@@ -190,6 +254,31 @@ async function transferAsset(event) {
   } catch (error) { toast(error.message || "The handoff could not be recorded.", true); }
 }
 
+async function createUser(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const validation = validateUserInput({ name: form.get("name"), email: form.get("email"), role: form.get("role"), password: form.get("password") });
+  if (!validation.valid) { toast(validation.message, true); return; }
+  if (state.users.some((user) => user.email === validation.value.email)) { toast("A user with that email already exists.", true); return; }
+  try {
+    if (runtime.demoMode) {
+      const user = { id: `usr-${Date.now()}`, name: validation.value.name, email: validation.value.email, role: validation.value.role, status: "Active", lastAccess: "Never" };
+      state.users.unshift(user); state.activity.unshift({ title: "User profile created", detail: `${user.name} · ${roleLabel(user.role)}`, time: "Just now" }); saveState(); toast(`${user.name} was added to the workspace.`); navigate("users"); return;
+    }
+    await apiRequest("users", { method: "POST", body: JSON.stringify(validation.value) }); state = await loadRemoteState(); toast("User created securely."); navigate("users");
+  } catch (error) { toast(error.message || "The user could not be created.", true); }
+}
+
+async function savePermissions(event) {
+  event.preventDefault();
+  const permissions = {};
+  ROLE_DEFINITIONS.forEach((role) => { permissions[role.id] = [...document.querySelectorAll(`[data-permission-role="${role.id}"]:checked`)].map((input) => input.dataset.permission); });
+  try {
+    if (runtime.demoMode) { state.permissions = permissions; saveState(); toast("Permission policy saved in this browser."); return; }
+    await apiRequest("permissions", { method: "PUT", body: JSON.stringify({ permissions }) }); state.permissions = permissions; toast("Permission policy saved securely.");
+  } catch (error) { toast(error.message || "The permission policy could not be saved.", true); }
+}
+
 async function signOut() {
   try { if (!runtime.demoMode) await apiRequest("logout", { method: "POST" }); } catch { /* always clear the local session */ }
   currentUser = null; csrfToken = ""; try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ } document.querySelector("#user-menu").classList.remove("is-open"); renderLogin();
@@ -197,7 +286,10 @@ async function signOut() {
 
 async function boot() {
   if (runtime.demoMode) {
-    try { currentUser = JSON.parse(sessionStorage.getItem(SESSION_KEY)); } catch { currentUser = null; }
+    try {
+      const storedUser = JSON.parse(sessionStorage.getItem(SESSION_KEY));
+      currentUser = storedUser ? { ...storedUser, role: storedUser.role === "Operations admin" ? "admin" : storedUser.role } : null;
+    } catch { currentUser = null; }
     if (currentUser) { await enterWorkspace(); } else renderLogin();
     return;
   }

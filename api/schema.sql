@@ -14,6 +14,24 @@ CREATE TABLE login_attempts (
   window_started TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE password_reset_tokens (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  token_hash CHAR(64) NOT NULL UNIQUE,
+  expires_at DATETIME NOT NULL,
+  used_at DATETIME NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_reset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_reset_expiry (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE role_permissions (
+  role VARCHAR(30) NOT NULL,
+  permission_key VARCHAR(60) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (role, permission_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE warranties (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   warranty_id VARCHAR(40) NOT NULL UNIQUE,
@@ -65,6 +83,14 @@ CREATE TABLE audit_events (
   INDEX idx_audit_created (created_at),
   INDEX idx_audit_entity (entity_type, entity_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO role_permissions (role, permission_key) VALUES
+  ('admin', 'dashboard.view'), ('admin', 'warranties.read'), ('admin', 'warranties.create'), ('admin', 'inventory.read'), ('admin', 'inventory.transfer'), ('admin', 'traceability.read'), ('admin', 'users.manage'), ('admin', 'roles.manage'),
+  ('operations_admin', 'dashboard.view'), ('operations_admin', 'warranties.read'), ('operations_admin', 'warranties.create'), ('operations_admin', 'inventory.read'), ('operations_admin', 'inventory.transfer'), ('operations_admin', 'traceability.read'), ('operations_admin', 'users.manage'),
+  ('manager', 'dashboard.view'), ('manager', 'warranties.read'), ('manager', 'warranties.create'), ('manager', 'inventory.read'), ('manager', 'inventory.transfer'), ('manager', 'traceability.read'),
+  ('warehouse', 'dashboard.view'), ('warehouse', 'warranties.read'), ('warehouse', 'inventory.read'), ('warehouse', 'inventory.transfer'), ('warehouse', 'traceability.read'),
+  ('viewer', 'dashboard.view'), ('viewer', 'warranties.read'), ('viewer', 'inventory.read'), ('viewer', 'traceability.read')
+ON DUPLICATE KEY UPDATE permission_key = VALUES(permission_key);
 
 -- Generate a real hash on the server before inserting an operator:
 -- php -r "echo password_hash('REPLACE_WITH_A_LONG_PASSWORD', PASSWORD_DEFAULT), PHP_EOL;"

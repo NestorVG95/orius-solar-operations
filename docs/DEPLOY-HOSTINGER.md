@@ -23,6 +23,10 @@ php -r "echo password_hash('CambiaEstaClavePorUnaLarga', PASSWORD_DEFAULT), PHP_
 5. Deja `session_secure` en `true` cuando HTTPS esté activo.
 6. Verifica que `api/config.php` no sea descargable; el `.htaccess` lo bloquea, pero la protección de servidor debe confirmarse.
 
+The imported schema also creates `password_reset_tokens` and `role_permissions`. Keep both tables: recovery and profile policy depend on them.
+
+Configure a private mail adapter for recovery delivery. The API response is intentionally generic and never sends the raw reset token to the browser.
+
 ## 3. Frontend
 
 En la copia de producción modifica únicamente:
@@ -49,3 +53,10 @@ La generación de PDF debe ejecutarse desde el servidor o un Apps Script privado
 - Transferencia simultánea del mismo activo.
 - Descarga de documentos sin autorización.
 - Revocación de usuario y restauración de una copia de la base.
+
+Additional access tests:
+
+- A viewer opening users or permissions must receive `403`.
+- An authorized operator can create a user only with an allowed profile.
+- Only an administrator can save the permission matrix with a valid CSRF token.
+- Recovery requests for known and unknown emails must expose the same response.

@@ -22,6 +22,8 @@ The optional API in `api/index.php` is the production boundary: it uses server-s
 - Put Google Drive and Hostinger credentials on the server only; never in client JavaScript.
 - Use an allowlist for CORS, HTTPS-only cookies, `HttpOnly`, `Secure`, and `SameSite=Lax` or stricter.
 - Require authentication and role authorization for create, update, transfer, and document-download actions.
+- Keep password-recovery responses generic, rate-limit reset requests, expire one-time tokens, and deliver them only through a private mail adapter.
+- Store role permissions server-side and protect policy changes with admin authorization plus CSRF.
 - Validate all fields server-side with length, type, and allowlist checks. Client validation is only UX.
 - Use PDO prepared statements and database constraints; never concatenate SQL.
 - Add CSRF protection to cookie-authenticated mutations and rate-limit login and document-generation endpoints.

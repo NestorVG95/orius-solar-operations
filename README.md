@@ -19,10 +19,13 @@ La demo está en `portal/` y guarda datos sintéticos en `localStorage`:
 - **Warranties:** busca registros y crea certificados sintéticos con validación básica.
 - **Inventory:** muestra custodia de herramientas y permite registrar un traslado.
 - **Traceability:** presenta la línea de auditoría conectada al proyecto.
+- **Account recovery:** inicia un flujo de recuperación con respuesta genérica para no revelar si un correo existe.
+- **Users:** permite crear operadores sintéticos y asignarles un perfil de mínimo privilegio.
+- **Permissions:** muestra y modifica la matriz de permisos por perfil en modo demo.
 
 Todos los registros son locales y tienen una etiqueta visible de demo. No hay llamadas de red ni endpoints privados en el frontend.
 
-La demo ahora tiene un CRM mínimo con entrada por usuario y contraseña, sesión de navegador, menú de usuario y cierre de sesión. Credenciales sintéticas públicas:
+La demo ahora tiene un CRM mínimo con entrada por usuario y contraseña, recuperación segura, sesión de navegador, menú de usuario, administración de usuarios, matriz de permisos y cierre de sesión. Credenciales sintéticas públicas:
 
 ```text
 Email:    demo@orius.local

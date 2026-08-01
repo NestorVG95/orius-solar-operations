@@ -21,6 +21,17 @@ test("signs in and renders only the authenticated dashboard", async ({ page }) =
   await signIn(page);
   await expect(page.getByRole("heading", { name: /Solar operations/ })).toBeVisible();
   await expect(page.getByText("Local demo adapter")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Users" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Permissions" })).toBeVisible();
+});
+
+test("starts a privacy-safe password recovery request", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Forgot password?" }).click();
+  await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible();
+  await page.locator("#recovery-email").fill("someone@example.test");
+  await page.getByRole("button", { name: /Send recovery link/ }).click();
+  await expect(page.locator("#recovery-message")).toContainText("If the account exists");
 });
 
 test("creates a warranty and records an asset transfer", async ({ page }) => {
@@ -39,6 +50,23 @@ test("creates a warranty and records an asset transfer", async ({ page }) => {
   await page.locator("#custodian").fill("Crew Horizon");
   await page.getByRole("button", { name: /Save handoff/ }).click();
   await expect(page.locator("#asset-rows")).toContainText("Van OR-05");
+});
+
+test("creates a user and updates the demo permission matrix", async ({ page }) => {
+  await signIn(page);
+  await page.getByRole("button", { name: "Users" }).click();
+  await page.locator("#user-name-input").fill("Jamie Parker");
+  await page.locator("#user-email-input").fill("jamie@example.test");
+  await page.locator("#user-password-input").fill("LongTemporary!2026");
+  await page.locator("#user-role-input").selectOption("manager");
+  await page.locator("#new-user-form button[type=submit]").click();
+  await expect(page.locator("#user-rows")).toContainText("Jamie Parker");
+
+  await page.getByRole("button", { name: "Permissions" }).click();
+  const transferPermission = page.locator('[data-permission-role="viewer"][data-permission="inventory.transfer"]');
+  await transferPermission.check({ force: true });
+  await page.getByRole("button", { name: /Save permission policy/ }).click();
+  await expect(page.locator("#toast-region")).toContainText("Permission policy saved");
 });
 
 test("signs out and returns to the login screen", async ({ page }) => {

@@ -34,6 +34,11 @@ Hostinger is the system of record for users, projects, assets, and audit events.
 - `POST /api/index.php?action=transfers` — append an immutable transfer event.
 - `GET /api/index.php?action=timeline` — return the joined audit trail.
 - `POST /api/index.php?action=logout` — destroy the current session.
+- `POST /api/index.php?action=request-password-reset` — start a generic recovery request without revealing whether an account exists.
+- `GET /api/index.php?action=users` — list users for administrators and operations administrators.
+- `POST /api/index.php?action=users` — create a user with a server-side password hash and role authorization.
+- `GET /api/index.php?action=permissions` — read the role permission matrix.
+- `PUT /api/index.php?action=permissions` — replace the matrix as an administrator, protected by CSRF.
 
 The first implementation is in `api/index.php`. It uses PHP sessions with `HttpOnly`, `SameSite=Lax`, optional `Secure` cookies, PDO prepared statements, CSRF headers, password hashing verification, role checks, transactions, and generic server errors.
 
@@ -47,3 +52,11 @@ Every mutation must write an audit event with actor, action, record ID, timestam
 4. Add a private Google Apps Script/Drive integration or a server-side Google OAuth flow for PDF output.
 5. Replace the local adapter only when the API has a staging environment and contract tests.
 6. Keep `VITE_DEMO_MODE=true` for the public portfolio link and publish production separately.
+
+## Account and access flows
+
+The demo exposes three administration surfaces for portfolio review:
+
+- **Password recovery:** uses a generic response so an email cannot be used to enumerate users. Demo mode simulates the request locally; production requires a private mail adapter to deliver the one-time token.
+- **Users:** creates synthetic operators with a temporary password and a least-privilege role. The API stores only a `password_hash` and never returns credentials.
+- **Permissions:** lets an administrator review and save the role matrix. In production, changes require an admin session and CSRF token; the public demo stores the matrix only in the browser.

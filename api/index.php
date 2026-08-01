@@ -92,6 +92,23 @@ function requireCsrf(): void
     }
 }
 
+function validRole(string $role): bool
+{
+    return in_array($role, ['admin', 'operations_admin', 'manager', 'warehouse', 'viewer'], true);
+}
+
+function roleCanCreate(string $actorRole, string $newRole): bool
+{
+    if ($actorRole === 'admin') return validRole($newRole);
+    if ($actorRole === 'operations_admin') return in_array($newRole, ['operations_admin', 'manager', 'warehouse', 'viewer'], true);
+    return false;
+}
+
+function validPermission(string $permission): bool
+{
+    return in_array($permission, ['dashboard.view', 'warranties.read', 'warranties.create', 'inventory.read', 'inventory.transfer', 'traceability.read', 'users.manage', 'roles.manage'], true);
+}
+
 function textField(array $data, string $key, int $max, bool $required = true): string
 {
     $value = trim((string)($data[$key] ?? ''));
@@ -157,7 +174,83 @@ try {
         respond(['user' => $user, 'csrfToken' => $_SESSION['csrf_token']]);
     }
 
+    if ($action === 'request-password-reset' && $method === 'POST') {
+        $data = body();
+        $email = strtolower(textField($data, 'email', 190));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) respond(['message' => 'If the account exists, recovery instructions will be sent shortly.']);
+        $statement = $pdo->prepare('SELECT id FROM users WHERE email = :email AND is_active = 1 LIMIT 1');
+        $statement->execute(['email' => $email]);
+        $user = $statement->fetch();
+        if ($user) {
+            $rawToken = bin2hex(random_bytes(32));
+            $insert = $pdo->prepare('INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (:user, :token, DATE_ADD(CURRENT_TIMESTAMP, INTERVAL 30 MINUTE))');
+            $insert->execute(['user' => $user['id'], 'token' => hash('sha256', $rawToken)]);
+            // A private mail adapter must deliver the raw token. Never return it to the browser.
+        }
+        respond(['message' => 'If the account exists, recovery instructions will be sent shortly.']);
+    }
+
     requireAuth();
+
+    if ($action === 'users' && $method === 'GET') {
+        requireRoles(['admin', 'operations_admin']);
+        $records = $pdo->query("SELECT id, name, email, role, IF(is_active = 1, 'Active', 'Suspended') AS status, DATE_FORMAT(created_at, '%d %b %Y') AS lastAccess FROM users ORDER BY name ASC LIMIT 500")->fetchAll();
+        respond(['records' => $records]);
+    }
+
+    if ($action === 'users' && $method === 'POST') {
+        $actor = requireRoles(['admin', 'operations_admin']); requireCsrf(); $data = body();
+        $name = textField($data, 'name', 100); $email = strtolower(textField($data, 'email', 190)); $password = (string)($data['password'] ?? ''); $role = textField($data, 'role', 30);
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) respond(['message' => 'Work email is invalid.'], 422);
+        if (strlen($password) < 12 || strlen($password) > 128) respond(['message' => 'Temporary password must be between 12 and 128 characters.'], 422);
+        if (!roleCanCreate((string)$actor['role'], $role)) respond(['message' => 'Your role cannot assign that profile.'], 403);
+        $pdo->beginTransaction();
+        try {
+            $insert = $pdo->prepare('INSERT INTO users (name, email, password_hash, role) VALUES (:name, :email, :password_hash, :role)');
+            $insert->execute(['name' => $name, 'email' => $email, 'password_hash' => password_hash($password, PASSWORD_DEFAULT), 'role' => $role]);
+            $id = (int)$pdo->lastInsertId();
+            $audit = $pdo->prepare('INSERT INTO audit_events (actor_id, action, title, detail, entity_type, entity_id) VALUES (:actor, "user.created", "User profile created", :detail, "user", :entity)');
+            $audit->execute(['actor' => $actor['id'], 'detail' => $email . ' · ' . $role, 'entity' => (string)$id]);
+            $pdo->commit();
+            respond(['id' => $id], 201);
+        } catch (PDOException $error) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ((int)$error->errorInfo[1] === 1062) respond(['message' => 'A user with that email already exists.'], 409);
+            throw $error;
+        }
+    }
+
+    if ($action === 'permissions' && $method === 'GET') {
+        requireRoles(['admin', 'operations_admin']);
+        $rows = $pdo->query('SELECT role, permission_key FROM role_permissions ORDER BY role, permission_key')->fetchAll();
+        $permissions = [];
+        foreach ($rows as $row) $permissions[$row['role']][] = $row['permission_key'];
+        respond(['records' => $permissions]);
+    }
+
+    if ($action === 'permissions' && $method === 'PUT') {
+        requireRoles(['admin']); requireCsrf(); $data = body(); $requested = $data['permissions'] ?? [];
+        if (!is_array($requested)) respond(['message' => 'Permission policy is invalid.'], 422);
+        $normalizedPolicy = [];
+        foreach ($requested as $role => $permissionList) {
+            if (!validRole((string)$role) || !is_array($permissionList)) respond(['message' => 'Permission policy contains an invalid profile.'], 422);
+            $normalizedPolicy[$role] = [];
+            foreach ($permissionList as $permission) {
+                if (!validPermission((string)$permission)) respond(['message' => 'Permission policy contains an invalid capability.'], 422);
+                $normalizedPolicy[$role][] = $permission;
+            }
+        }
+        $pdo->beginTransaction();
+        $pdo->exec('DELETE FROM role_permissions');
+        $insert = $pdo->prepare('INSERT INTO role_permissions (role, permission_key) VALUES (:role, :permission)');
+        foreach ($normalizedPolicy as $role => $permissionList) {
+            foreach ($permissionList as $permission) {
+                $insert->execute(['role' => $role, 'permission' => $permission]);
+            }
+        }
+        $pdo->commit();
+        respond(['ok' => true]);
+    }
 
     if ($action === 'warranties' && $method === 'GET') {
         $records = $pdo->query("SELECT warranty_id AS id, project_number AS project, customer_name AS customer, site_address AS site, warranty_type AS type, issued_at AS issued, status FROM warranties ORDER BY issued_at DESC, id DESC LIMIT 200")->fetchAll();
