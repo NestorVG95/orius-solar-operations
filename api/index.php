@@ -178,6 +178,15 @@ try {
         $data = body();
         $email = strtolower(textField($data, 'email', 190));
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) respond(['message' => 'If the account exists, recovery instructions will be sent shortly.']);
+        $resetFingerprint = hash_hmac('sha256', 'reset|' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown') . '|' . $email, (string)$config['app_key']);
+        $resetAttempts = $pdo->prepare('SELECT attempts, window_started FROM login_attempts WHERE fingerprint = :fingerprint LIMIT 1');
+        $resetAttempts->execute(['fingerprint' => $resetFingerprint]);
+        $resetAttempt = $resetAttempts->fetch();
+        if ($resetAttempt && strtotime((string)$resetAttempt['window_started']) > (time() - 900) && (int)$resetAttempt['attempts'] >= 5) {
+            respond(['message' => 'If the account exists, recovery instructions will be sent shortly.']);
+        }
+        $recordResetAttempt = $pdo->prepare('INSERT INTO login_attempts (fingerprint, attempts, window_started) VALUES (:fingerprint, 1, CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE attempts = IF(window_started < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 15 MINUTE), 1, attempts + 1), window_started = IF(window_started < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 15 MINUTE), CURRENT_TIMESTAMP, window_started)');
+        $recordResetAttempt->execute(['fingerprint' => $resetFingerprint]);
         $statement = $pdo->prepare('SELECT id FROM users WHERE email = :email AND is_active = 1 LIMIT 1');
         $statement->execute(['email' => $email]);
         $user = $statement->fetch();
